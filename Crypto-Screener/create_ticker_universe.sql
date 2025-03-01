@@ -1,0 +1,5 @@
+CREATE OR REPLACE TABLE TICKER_UNIVERSE (
+    ticker VARCHAR(20),
+    coin_name VARCHAR(50),
+    
+)
