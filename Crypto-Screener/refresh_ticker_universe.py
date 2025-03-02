@@ -37,9 +37,8 @@ def main(args):
         df = pd.DataFrame(screen_tickers['all_cryptocurrencies_us']['quotes'])[['symbol', 'longName', 'shortName', 'marketCap']]
         df = df.rename({'symbol' : 'ticker', 'longName' : 'coin_full_name',
                         'shortName' : 'coin_name', 'marketCap' : "market_cap"}, axis = 1)
-        n_rows = df.to_sql(os.getenv("TICKER_UNIVERSE_TABLE"), engine, if_exists='replace', index = False)
-        print(f"Top {n_rows} coins captured and inserted into db")
-        
+        df.to_sql(os.getenv("TICKER_UNIVERSE_TABLE"), engine, if_exists='replace', index = False)
+        print("Successfully Inserted Records")
 
 if __name__ == "__main__":
         parser = argparse.ArgumentParser()
