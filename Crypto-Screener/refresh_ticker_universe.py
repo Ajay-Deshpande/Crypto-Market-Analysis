@@ -29,14 +29,20 @@ def main(args):
 
 
         import pandas as pd
-        from yahooquery import Screener
+        from yahooquery import Screener, Ticker
 
         screener = Screener()
         screen_tickers = screener.get_screeners(['all_cryptocurrencies_us'], 250)
 
         df = pd.DataFrame(screen_tickers['all_cryptocurrencies_us']['quotes'])[['symbol', 'longName', 'shortName', 'marketCap']]
+        tickers = Ticker(df.symbol.tolist())
+        asset_profile = pd.DataFrame.from_dict(tickers.asset_profile).T[['startDate', 'description']]
+        asset_profile = asset_profile[asset_profile['startDate'] != 'No fundamentals data found for any of the summaryTypes=assetProfile']
+        asset_profile['startDate'] = pd.to_datetime(asset_profile['startDate'])
+        df = df.merge(asset_profile, left_on = 'symbol', right_index=True)
         df = df.rename({'symbol' : 'ticker', 'longName' : 'coin_full_name',
-                        'shortName' : 'coin_name', 'marketCap' : "market_cap"}, axis = 1)
+                        'shortName' : 'coin_name', 'marketCap' : "market_cap",
+                        'startDate' : 'start_date'}, axis = 1)
         df.to_sql(os.getenv("TICKER_UNIVERSE_TABLE"), engine, if_exists='replace', index = False)
         print("Successfully Inserted Records")
 
