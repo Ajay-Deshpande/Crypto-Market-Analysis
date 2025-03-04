@@ -35,8 +35,14 @@ def main(args):
     symbols_1y = data.groupby('symbol').count()['date']
     symbols_1y = symbols_1y[symbols_1y < 365]
     data = data[~ data.symbol.isin(symbols_1y.index.tolist())]
-    print("Removing Tickers with less than one year of data... ", len(data.ticker.tolist()), " Tickers left")
-    data = data.groupby('symbol').apply(lambda x: add_all_ta_features(x.reset_index(drop=True).set_index('date'),
+    
+    data['date'] = pd.to_datetime(data['date'].apply(datetime.strftime, args=("%Y-%m-%d", ) ))
+
+    last_30d = data.sort_values('date').groupby('symbol').tail(30)
+    
+    print("Removing Tickers with less than one year of data... ", data.symbol.nunique(), " Tickers left")
+    
+    data = data.groupby('symbol').apply(lambda x: add_all_ta_features(x.reset_index(drop=True).set_index('date').sort_index(),
                                 open='open', high='high', low='low', close='close', volume='volume',\
                                 volume_cols=volume_cols, volatility_cols=volatility_cols, trend_cols=trend_cols, \
                                 momentum_cols=momentum_cols, other_ind_cols=other_ind_cols),
@@ -55,21 +61,13 @@ def main(args):
                                                     "momentum_ao" : "momentum_awesome_oscillator",
                                             })
 
-    data['date'] = pd.to_datetime(data['date'].apply(datetime.strftime, args=("%Y-%m-%d", ) ))
-
-    from io import StringIO
     import boto3
     client = boto3.resource('s3')
-    bucket = client.Bucket(os.getenv("TICKER_30D_BUCKET"))
-    
-    buffer = StringIO()
-    last_30d = data.sort_values('date').groupby('ticker').tail(30)
-    
-    last_30d.to_csv(buffer, index = False)
+    bucket = client.Bucket(os.getenv("TICKER_SNAPSHOT_BUCKET"))
     if not bucket.creation_date:
         bucket.create()
     
-    client.put_object(buffer.getvalue(), os.getenv("TICKER_30D_FILE"))
+    last_30d.to_csv(f's3://{os.getenv("TICKER_SNAPSHOT_BUCKET")}/{os.getenv("TICKER_SNAPSHOT_PRICE_FILE")}')
     
     data.to_sql(os.getenv("ALL_TICKER_DATA"), engine, if_exists="replace", index = False)
     
