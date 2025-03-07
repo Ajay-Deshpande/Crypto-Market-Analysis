@@ -1,6 +1,9 @@
 import argparse
 
 def main(args):
+    import warnings
+    warnings.filterwarnings('ignore')
+    
     import os
     from dotenv import load_dotenv
     load_dotenv()
@@ -20,9 +23,9 @@ def main(args):
     df = pd.read_sql(os.getenv("TICKER_UNIVERSE_TABLE"), engine)
     # Filter in safe coins
     # Consider coins with trading volume more than 1M and the coin is old (1 year)
-    df = df[(df['market_cap'] >= 10 ** 6) & ((pd.Timestamp.today() - df['start_date']) > pd.Timedelta(366, 'day'))]
+    df = df[(pd.Timestamp.today() - df['start_date']) > pd.Timedelta(366, 'day')]
     print("Screening Tickers... ", len(df.ticker.tolist()), " Tickers left")
-    data = yahooquery.Ticker(df['ticker'].tolist()).history(period='5y')
+    data = yahooquery.Ticker(df['ticker'].tolist()).history(period='max', interval='1d')
     data = data.reset_index()
     
     # Predefined set of indicators
@@ -36,11 +39,17 @@ def main(args):
     symbols_1y = symbols_1y[symbols_1y < 365]
     data = data[~ data.symbol.isin(symbols_1y.index.tolist())]
     
+    print("Removing Tickers with less than one year of data... ", data.symbol.nunique(), " Tickers left")
+
     data['date'] = pd.to_datetime(data['date'].apply(datetime.strftime, args=("%Y-%m-%d", ) ))
 
+    date_range_last_30d = pd.date_range(end=pd.Timestamp.today(), freq='D', periods=29, normalize=True)
+    symbols_last_30d = data.groupby('symbol').apply(lambda x: len(date_range_last_30d.difference(x.date.tolist())), include_groups=False)
+    del_symbols = symbols_last_30d[symbols_last_30d > 1]
+    data = data[~ data.symbol.isin(del_symbols.index.tolist())]
+    print("Removing Tickers with data missing for last 30 days... ", data.symbol.nunique(), " Tickers left")
+
     last_30d = data.sort_values('date').groupby('symbol').tail(30)
-    
-    print("Removing Tickers with less than one year of data... ", data.symbol.nunique(), " Tickers left")
     
     data = data.groupby('symbol').apply(lambda x: add_all_ta_features(x.reset_index(drop=True).set_index('date').sort_index(),
                                 open='open', high='high', low='low', close='close', volume='volume',\
@@ -67,9 +76,9 @@ def main(args):
     if not bucket.creation_date:
         bucket.create()
     
-    last_30d.to_csv(f's3://{os.getenv("TICKER_SNAPSHOT_BUCKET")}/{os.getenv("TICKER_SNAPSHOT_PRICE_FILE")}')
+    last_30d.to_csv(f's3://{os.getenv("TICKER_SNAPSHOT_BUCKET")}/{os.getenv("TICKER_SNAPSHOT_PRICE_FILE")}', index=False)
     
-    data.to_sql(os.getenv("ALL_TICKER_DATA"), engine, if_exists="replace", index = False)
+    data.to_sql(os.getenv("ALL_TICKER_DATA"), engine, if_exists="replace", index=False)
     
     print(f"Found {data.ticker.nunique()} tickers out of {df.ticker.nunique()}")
     print("Successfully Inserted Records")

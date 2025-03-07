@@ -1,6 +1,9 @@
 import argparse
 
 def main(args):
+        import warnings
+        warnings.filterwarnings('ignore')
+        
         import os
         from dotenv import load_dotenv
         load_dotenv()
@@ -32,7 +35,7 @@ def main(args):
         from yahooquery import Screener, Ticker
 
         screener = Screener()
-        screen_tickers = screener.get_screeners(['all_cryptocurrencies_us'], 250)
+        screen_tickers = screener.get_screeners(['all_cryptocurrencies_us'], args.number_of_ticker)
 
         df = pd.DataFrame(screen_tickers['all_cryptocurrencies_us']['quotes'])[['symbol', 'longName', 'shortName', 'marketCap']]
         tickers = Ticker(df.symbol.tolist())
@@ -51,8 +54,9 @@ if __name__ == "__main__":
         parser.add_argument("--database_name")
         parser.add_argument("--username")
         parser.add_argument("--password")
-        parser.add_argument("--host")
-        parser.add_argument("--port")
+        parser.add_argument("--host", default="localhost")
+        parser.add_argument("--port", default="5432")
+        parser.add_argument('--number_of_ticker', default="250")
 
         args = parser.parse_args()
         main(args)
