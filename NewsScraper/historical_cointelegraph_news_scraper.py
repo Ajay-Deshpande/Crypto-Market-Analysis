@@ -96,7 +96,7 @@ async def main():
         last_news_timestamp = None
         print("Collection was empty. Will try to collect last 2 years data")
     
-    latest_news_url = "" if not last_news_timestamp else last_news_timestamp['news_url']
+    # latest_news_url = "" if not last_news_timestamp else last_news_timestamp['news_url']
     last_news_timestamp = last_news_timestamp.get("news_collection_time") if last_news_timestamp else None
     
     if not last_news_timestamp:
