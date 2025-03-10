@@ -3,21 +3,22 @@ import argparse
 def main(args):
         import warnings
         warnings.filterwarnings('ignore')
-        
+        import sys
         import os
+        sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        
         from dotenv import load_dotenv
-        load_dotenv()
-
+        load_dotenv('../.env')
+        
         import psycopg2
         from crypto_utility.database_utility import DatabaseUtility
         from sqlalchemy import create_engine
-
-
+        
         db_name = args.database_name if args.database_name else os.getenv("POSTGRES_DB")
         db_user = args.username if args.username else os.getenv("POSTGRES_USER")
-        db_pass = args.password if args.password else os.getenv("POSTGRES_USER")
-        db_host = args.host if args.host else os.getenv("HOST", "localhost")
-        db_port = args.port if args.password else os.getenv("PORT", "5432")
+        db_pass = args.password if args.password else os.getenv("POSTGRES_PASSWORD")
+        db_host = args.host if args.host else os.getenv("POSTGRES_HOST", "localhost")
+        db_port = args.port if args.password else os.getenv("POSTGRES_PORT", "5432")
         
         connection = psycopg2.connect(user=db_user, password=db_pass, host=db_host, port=db_port)
         cursor = connection.cursor()
@@ -54,8 +55,8 @@ if __name__ == "__main__":
         parser.add_argument("--database_name")
         parser.add_argument("--username")
         parser.add_argument("--password")
-        parser.add_argument("--host", default="localhost")
-        parser.add_argument("--port", default="5432")
+        parser.add_argument("--host")
+        parser.add_argument("--port")
         parser.add_argument('--number_of_ticker', default="250")
 
         args = parser.parse_args()

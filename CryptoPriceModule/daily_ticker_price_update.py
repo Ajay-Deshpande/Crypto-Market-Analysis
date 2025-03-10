@@ -5,13 +5,15 @@ def main(args):
     warnings.filterwarnings('ignore')
 
     import pandas as pd
+    
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv('../.env')
+    
     import os
     import yahooquery
     from ta import add_all_ta_features
     from sqlalchemy import create_engine
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     volume_cols = set(['volume_obv', 'volume_vwap', 'volume_mfi'])
     volatility_cols = set(['volatility_atr', 'volatility_bbw'])
@@ -20,6 +22,14 @@ def main(args):
     other_ind_cols = set(['others_dr'])
 
     df = pd.read_csv(f's3://{os.getenv("TICKER_SNAPSHOT_BUCKET")}/{os.getenv("TICKER_SNAPSHOT_PRICE_FILE")}')
+    print(pd.to_datetime(df['date']).max())
+    last_working_day = datetime.today()
+    # Find last working day that is completed
+    last_working_day = (last_working_day - timedelta(days=int(last_working_day.weekday() == 6), hours=23))
+    
+    if datetime.strptime(df['date'].max(), "%Y-%m-%d") >= last_working_day:
+        print("Today's records already updated")
+        return 
     ticks = yahooquery.Ticker(df.symbol.unique().tolist())
     df = ticks.history(period='1mo', interval='1d').reset_index()
     
