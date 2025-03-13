@@ -6,7 +6,7 @@ def main(args):
     
     import os
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv('../.env')
 
     import pandas as pd
     from sqlalchemy import create_engine
