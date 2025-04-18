@@ -45,7 +45,7 @@ def process_article(article, kafka_article_data, domain='https://cointelegraph.c
 
     return kafka_article_data
 
-async def main():
+def main():
 
     from selenium import webdriver
     from selenium.webdriver import ActionChains
@@ -57,8 +57,8 @@ async def main():
     driver = webdriver.Chrome(options=options)
     producer = NewsMQSetup()
     
-    from pymongo import AsyncMongoClient
-    mongo_client = AsyncMongoClient("localhost", 27017)
+    from pymongo import MongoClient
+    mongo_client = MongoClient("localhost", 27017)
 
     def post_scrape_message(message):
         nonlocal producer
@@ -67,23 +67,6 @@ async def main():
         producer.send(os.getenv("NEWS_MQ"), json.dumps(message).encode('utf-8'), key=message['news_id'].encode('utf-8'))
         return
     
-    async def flush_data_to_db(processed_articles):
-        nonlocal mongo_client
-        db = mongo_client[os.getenv("MONGO_DATABASE")]
-        if os.getenv("MONGO_NEWS_COLLECTION") not in await db.list_collection_names():
-            collection = db.create_collection(os.getenv("MONGO_NEWS_COLLECTION"))
-
-        collection = db.get_collection(os.getenv("MONGO_NEWS_COLLECTION"))
-
-        batch = []
-        for article in processed_articles:
-            batch.append(article)
-            if len(batch) == 10:
-                await collection.insert_many(batch)
-                batch = []
-        if batch:
-            await collection.insert_many(batch)
-
     domain = "https://cointelegraph.com"
 
     tags = ['markets', 'technology','business','regulation', 'investments', 'nft']
@@ -91,12 +74,11 @@ async def main():
     news_collection = mongo_client[os.getenv("MONGO_DATABASE")].get_collection(os.getenv("MONGO_NEWS_COLLECTION"))
     
     try:
-        last_news_timestamp = await news_collection.find().sort({'news_collection_time':-1}).limit(1).next()
+        last_news_timestamp = news_collection.find().sort({'news_collection_time':-1}).limit(1).next()
     except StopAsyncIteration:
         last_news_timestamp = None
         print("Collection was empty. Will try to collect last 2 years data")
     
-    # latest_news_url = "" if not last_news_timestamp else last_news_timestamp['news_url']
     last_news_timestamp = last_news_timestamp.get("news_collection_time") if last_news_timestamp else None
     
     if not last_news_timestamp:
@@ -107,9 +89,7 @@ async def main():
         print("Starting with", domain + "/tags/" + tag)
         
         total_tag_articles = 0
-        processed_articles = []
         while total_tag_articles < 5000:
-            processed_articles = []
             elems = driver.find_elements('xpath', '(//article[@class="post-card-inline"])[last()]')
             if not elems:
                 break
@@ -131,23 +111,17 @@ async def main():
                 article_json_data = process_article(article, article_json_data, domain=domain)
                 if article_json_data['news_url']:
                     break
-                post_scrape_message({'news_id' : article_json_data['news_id'], 'news_url' : article_json_data['news_url']})
-                processed_articles.append(article_json_data)
-            
-            await flush_data_to_db(processed_articles)
-
+                post_scrape_message(article_json_data)
+                
             ActionChains(driver).scroll_to_element(elems[0]).perform()
             driver.implicitly_wait(1)
             total_tag_articles += len(articles)
             print(total_tag_articles)
         
         producer.flush()
-        if processed_articles:
-            await flush_data_to_db(processed_articles)
-
+        
     driver.close()
-    await mongo_client.aclose()
-
+    
 if __name__ == "__main__":
     import asyncio
 
